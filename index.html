@@ -40,7 +40,8 @@
     <nav class="hidden md:flex gap-1">
       <button onclick="showPage('dashboard')" data-nav="dashboard" class="px-4 py-2 rounded-lg text-sm font-medium">แดชบอร์ด</button>
       <button onclick="showPage('board')" data-nav="board" class="px-4 py-2 rounded-lg text-sm font-medium">บอร์ดงาน</button>
-      <button onclick="showPage('settings')" data-nav="settings" class="px-4 py-2 rounded-lg text-sm font-medium">ตั้งค่า LINE</button>
+      <button onclick="showPage('team')" data-nav="team" class="px-4 py-2 rounded-lg text-sm font-medium">สมาชิก</button>
+      <button onclick="showPage('settings')" data-nav="settings" class="px-4 py-2 rounded-lg text-sm font-medium">ตั้งค่า</button>
     </nav>
     <button onclick="openModal()" class="hidden md:block bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ สร้างงาน</button>
     <span id="hdr-title" class="md:hidden text-sm text-slate-500">แดชบอร์ด</span>
@@ -87,14 +88,39 @@
     <div id="board" class="scroll-x flex md:grid md:grid-cols-4 gap-3 overflow-x-auto pb-2 -mx-3 px-3 md:mx-0 md:px-0"></div>
   </section>
 
+  <!-- ================= TEAM ================= -->
+  <section id="page-team" class="hidden max-w-2xl">
+    <h1 class="text-xl md:text-2xl font-bold mb-1">สมาชิกทีม</h1>
+    <p class="text-slate-500 text-xs md:text-sm mb-4">เพิ่มหรือลบรายชื่อผู้รับผิดชอบงาน</p>
+
+    <div class="bg-white rounded-xl border p-4 mb-3">
+      <label class="block text-sm font-medium mb-2">เพิ่มสมาชิกใหม่</label>
+      <div class="flex gap-2">
+        <input id="f-newuser" maxlength="20" placeholder="พิมพ์ชื่อ เช่น อนันต์"
+          class="flex-1 border rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-emerald-400 outline-none">
+        <button onclick="addUser()" class="bg-emerald-500 text-white px-5 py-3 rounded-xl text-sm font-medium shrink-0 active:scale-95 transition">เพิ่ม</button>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-2">ชื่อห้ามซ้ำ · ยาวไม่เกิน 20 ตัวอักษร</p>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex items-center justify-between mb-2">
+        <p class="font-bold text-sm">รายชื่อทั้งหมด</p>
+        <span id="member-count" class="text-xs text-slate-500"></span>
+      </div>
+      <div id="members" class="divide-y"></div>
+      <p class="text-[11px] text-slate-400 mt-3">ลบสมาชิกที่มีงานค้าง ระบบจะย้ายงานไปให้คนอื่นให้อัตโนมัติ</p>
+    </div>
+  </section>
+
   <!-- ================= SETTINGS ================= -->
   <section id="page-settings" class="hidden max-w-2xl">
-    <h1 class="text-xl md:text-2xl font-bold mb-4">ตั้งค่า LINE</h1>
+    <h1 class="text-xl md:text-2xl font-bold mb-4">ตั้งค่า</h1>
 
     <div class="bg-white rounded-xl border p-4 mb-3">
       <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <p class="font-bold text-sm">สถานะการเชื่อมต่อ</p>
+          <p class="font-bold text-sm">สถานะการเชื่อมต่อ LINE</p>
           <p id="line-status" class="text-xs text-slate-500 mt-0.5">ยังไม่ได้เชื่อมต่อ</p>
         </div>
         <button id="line-btn" onclick="toggleLine()" class="bg-[#06C755] text-white px-4 py-2.5 rounded-lg text-sm font-medium shrink-0">เชื่อมต่อ</button>
@@ -140,9 +166,10 @@
 
 <!-- ================= BOTTOM NAV ================= -->
 <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t safe-b">
-  <div class="grid grid-cols-3">
+  <div class="grid grid-cols-4">
     <button onclick="showPage('dashboard')" data-tab="dashboard" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">📊</span>แดชบอร์ด</button>
     <button onclick="showPage('board')" data-tab="board" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">📋</span>บอร์ดงาน</button>
+    <button onclick="showPage('team')" data-tab="team" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">👥</span>สมาชิก</button>
     <button onclick="showPage('settings')" data-tab="settings" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">⚙️</span>ตั้งค่า</button>
   </div>
 </nav>
@@ -226,9 +253,10 @@ const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return x.toIS
 const today = () => new Date().toISOString().slice(0,10);
 const isMobile = () => window.innerWidth < 768;
 const fmtDate = s => s ? new Date(s).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+const initial = s => (String(s || '?').trim()[0] || '?');
 
 /* ========== CONFIG ========== */
-const USERS = ['สมชาย','สมหญิง','วิชัย','ปรีชา'];
+const DEFAULT_USERS = ['สมชาย','สมหญิง','วิชัย','ปรีชา'];
 const COLS = [
   {k:'TODO',   label:'รอดำเนินการ', dot:'bg-slate-400',   btn:'bg-slate-100 text-slate-700'},
   {k:'DOING',  label:'กำลังทำ',      dot:'bg-blue-500',    btn:'bg-blue-100 text-blue-700'},
@@ -241,7 +269,7 @@ const PRI = {
   LOW:    ['ต่ำ',  'bg-slate-100 text-slate-600'],
 };
 const NOTIFS = ['ได้รับมอบหมายงานใหม่','เตือนก่อนครบกำหนด 1 วัน','งานเลยกำหนด','มีการเปลี่ยนสถานะ','สรุปงานประจำวัน 09:00'];
-const PAGES = {dashboard:'แดชบอร์ด', board:'บอร์ดงาน', settings:'ตั้งค่า LINE'};
+const PAGES = {dashboard:'แดชบอร์ด', board:'บอร์ดงาน', team:'สมาชิกทีม', settings:'ตั้งค่า'};
 const SEED = () => ([
   {id:1,title:'ทำสไลด์นำเสนอลูกค้า',desc:'เตรียม 15 หน้า พร้อมตัวเลขไตรมาส 3',assignee:'สมชาย',due:d(-2),priority:'HIGH',status:'DOING'},
   {id:2,title:'สรุปยอดขายรายเดือน',desc:'',assignee:'สมหญิง',due:d(1),priority:'NORMAL',status:'TODO'},
@@ -252,8 +280,8 @@ const SEED = () => ([
 ]);
 
 /* ========== STATE ========== */
-let tasks = [], editId = null, sheetId = null, dragId = null, filter = 'ALL', lineConnected = false;
-let trash = null;   // เก็บงานที่เพิ่งลบ ไว้กู้คืน
+let tasks = [], users = [], editId = null, sheetId = null, dragId = null, filter = 'ALL', lineConnected = false;
+let trash = null;
 
 function load(){
   try {
@@ -263,9 +291,67 @@ function load(){
   } catch { tasks = SEED(); }
 }
 function save(){
-  try { localStorage.setItem('taskflow.tasks', JSON.stringify(tasks)); } catch(e){ console.warn('บันทึกไม่ได้:', e); }
+  try { localStorage.setItem('taskflow.tasks', JSON.stringify(tasks)); } catch(e){ console.warn(e); }
+}
+function loadUsers(){
+  try {
+    const raw = localStorage.getItem('taskflow.users');
+    const parsed = raw ? JSON.parse(raw) : null;
+    users = (Array.isArray(parsed) && parsed.length) ? parsed : [...DEFAULT_USERS];
+  } catch { users = [...DEFAULT_USERS]; }
+}
+function saveUsers(){
+  try { localStorage.setItem('taskflow.users', JSON.stringify(users)); } catch(e){ console.warn(e); }
 }
 const isOverdue = t => t.due && t.due < today() && t.status !== 'DONE';
+
+/* ========== จัดการสมาชิก ========== */
+function addUser(){
+  const el = $('f-newuser');
+  const name = el.value.trim();
+  if(!name){ el.focus(); return; }
+  if(name.length > 20){ alert('ชื่อยาวเกินไป (ไม่เกิน 20 ตัวอักษร)'); return; }
+  if(users.some(u => u.toLowerCase() === name.toLowerCase())){
+    alert(`มีชื่อ "${name}" อยู่แล้ว`); el.select(); return;
+  }
+  users.push(name);
+  saveUsers();
+  el.value = '';
+  render();
+  notify(`👤 เพิ่ม "${name}" เข้าทีมเรียบร้อย`, {tag:'สมาชิกทีม'});
+}
+
+function removeUser(name){
+  if(users.length <= 1){ alert('ต้องมีสมาชิกอย่างน้อย 1 คน'); return; }
+  const mine = tasks.filter(t => t.assignee === name);
+  const to = users.find(u => u !== name);
+  if(mine.length){
+    if(!confirm(`"${name}" มีงานอยู่ ${mine.length} รายการ\n\nถ้าลบ งานทั้งหมดจะถูกย้ายไปให้ "${to}"\nยืนยันหรือไม่?`)) return;
+    mine.forEach(t => t.assignee = to);
+    save();
+  } else if(!confirm(`ลบ "${name}" ออกจากทีมใช่ไหม?`)) return;
+
+  users = users.filter(u => u !== name);
+  if(filter === name) filter = 'ALL';
+  saveUsers();
+  render();
+  notify(`👤 ลบ "${name}" ออกจากทีมแล้ว${mine.length ? ` · ย้าย ${mine.length} งานให้ ${to}` : ''}`, {tag:'สมาชิกทีม'});
+}
+
+function renameUser(oldName){
+  const name = prompt('เปลี่ยนชื่อเป็น:', oldName);
+  if(name === null) return;
+  const n = name.trim();
+  if(!n){ alert('กรุณากรอกชื่อ'); return; }
+  if(n === oldName) return;
+  if(n.length > 20){ alert('ชื่อยาวเกินไป (ไม่เกิน 20 ตัวอักษร)'); return; }
+  if(users.some(u => u.toLowerCase() === n.toLowerCase())){ alert(`มีชื่อ "${n}" อยู่แล้ว`); return; }
+  users = users.map(u => u === oldName ? n : u);
+  tasks.forEach(t => { if(t.assignee === oldName) t.assignee = n; });
+  if(filter === oldName) filter = n;
+  saveUsers(); save(); render();
+  notify(`✏️ เปลี่ยนชื่อ "${oldName}" → "${n}" แล้ว`, {tag:'สมาชิกทีม'});
+}
 
 /* ========== NAVIGATION ========== */
 function showPage(p){
@@ -311,7 +397,7 @@ function render(){
       <p class="text-2xl md:text-3xl font-bold ${c}">${v}</p>
     </div>`).join('');
 
-  /* — รายการเตือน (แตะเพื่อแก้ไข / ปุ่มลบท้ายแถว) — */
+  /* — รายการเตือน — */
   const row = t => `
     <div class="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
       <div onclick="openTask(${t.id})" class="min-w-0 flex-1 cursor-pointer active:opacity-70">
@@ -329,7 +415,7 @@ function render(){
   $('soon-list').innerHTML    = soon.length ? soon.map(row).join('') : empty;
 
   /* — งานแยกตามคน — */
-  $('by-user').innerHTML = USERS.map(u => {
+  $('by-user').innerHTML = users.length ? users.map(u => {
     const mine = tasks.filter(t => t.assignee === u);
     const done = mine.filter(t => t.status === 'DONE').length;
     const pct  = mine.length ? Math.round(done / mine.length * 100) : 0;
@@ -342,11 +428,28 @@ function render(){
         <div class="h-full bg-emerald-500 rounded-full transition-all" style="width:${pct}%"></div>
       </div>
     </div>`;
+  }).join('') : '<p class="text-sm text-slate-400 text-center py-3">ยังไม่มีสมาชิก</p>';
+
+  /* — รายชื่อสมาชิก (หน้า TEAM) — */
+  $('member-count').textContent = `${users.length} คน`;
+  $('members').innerHTML = users.map(u => {
+    const n = tasks.filter(t => t.assignee === u).length;
+    return `<div class="flex items-center gap-3 py-3">
+      <div class="w-9 h-9 rounded-full bg-emerald-500 text-white text-sm font-bold grid place-items-center shrink-0">${esc(initial(u))}</div>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium text-sm truncate">${esc(u)}</p>
+        <p class="text-[11px] text-slate-500">${n} งาน</p>
+      </div>
+      <button onclick="renameUser('${esc(u).replace(/'/g,"\\'")}')" title="เปลี่ยนชื่อ"
+        class="w-9 h-9 grid place-items-center rounded-lg hover:bg-slate-100 active:bg-slate-200 shrink-0">✏️</button>
+      <button onclick="removeUser('${esc(u).replace(/'/g,"\\'")}')" title="ลบ"
+        class="w-9 h-9 grid place-items-center rounded-lg hover:bg-red-50 active:bg-red-100 shrink-0">🗑️</button>
+    </div>`;
   }).join('');
 
   /* — ตัวกรองผู้รับผิดชอบ — */
-  $('user-filters').innerHTML = USERS.map(u =>
-    `<button onclick="setFilter('${esc(u)}')" data-flt="${esc(u)}" class="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border">${esc(u)}</button>`).join('');
+  $('user-filters').innerHTML = users.map(u =>
+    `<button onclick="setFilter('${esc(u).replace(/'/g,"\\'")}')" data-flt="${esc(u)}" class="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border">${esc(u)}</button>`).join('');
   document.querySelectorAll('[data-flt]').forEach(b => {
     const on = b.dataset.flt === filter;
     b.className = 'shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border ' +
@@ -371,7 +474,6 @@ function render(){
   }).join('');
 }
 
-/* การ์ด: แตะตัวการ์ด = เปิดดู/เปลี่ยนสถานะ, ปุ่ม ✏️ = แก้ไข, ปุ่ม 🗑️ = ลบ */
 function card(t){
   return `<div draggable="true" ondragstart="drag(event,${t.id},this)" ondragend="this.classList.remove('dragging')"
       class="bg-white rounded-xl p-3 shadow-sm transition ${isOverdue(t) ? 'border-l-4 border-red-500' : ''}">
@@ -384,7 +486,7 @@ function card(t){
       </div>
     </div>
     <div class="flex items-center gap-1.5 mt-2 pt-2 border-t">
-      <div class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] grid place-items-center shrink-0">${esc(t.assignee[0])}</div>
+      <div class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] grid place-items-center shrink-0">${esc(initial(t.assignee))}</div>
       <span class="text-[11px] text-slate-600 truncate">${esc(t.assignee)}</span>
       <button onclick="event.stopPropagation();openModal(${t.id})" title="แก้ไข"
         class="ml-auto w-7 h-7 grid place-items-center rounded-lg hover:bg-slate-100 active:bg-slate-200 text-sm shrink-0">✏️</button>
@@ -396,7 +498,7 @@ function card(t){
 
 function setFilter(f){ filter = f; render(); }
 
-/* ========== เปิดงาน: มือถือ=sheet / เดสก์ท็อป=modal ========== */
+/* ========== เปิดงาน ========== */
 function openTask(id){ isMobile() ? openSheet(id) : openModal(id); }
 
 function openSheet(id){
@@ -422,16 +524,8 @@ function setStatus(k){
   }
   closeSheet();
 }
-function editFromSheet(){
-  const id = sheetId;
-  closeSheet();
-  setTimeout(() => openModal(id), 200);
-}
-function delFromSheet(){
-  const id = sheetId;
-  closeSheet();
-  setTimeout(() => removeTask(id), 200);
-}
+function editFromSheet(){ const id = sheetId; closeSheet(); setTimeout(() => openModal(id), 200); }
+function delFromSheet(){ const id = sheetId; closeSheet(); setTimeout(() => removeTask(id), 200); }
 
 /* ========== DRAG & DROP ========== */
 function drag(e, id, el){ dragId = id; el.classList.add('dragging'); e.stopPropagation(); }
@@ -447,13 +541,23 @@ function drop(e, status, el){
 }
 
 /* ========== CREATE / EDIT ========== */
+function fillAssignee(sel){
+  const list = [...users];
+  if(sel && !list.includes(sel)) list.unshift(sel);
+  $('f-assignee').innerHTML = list.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+}
 function openModal(id = null){
+  if(!users.length){
+    alert('ยังไม่มีสมาชิกในทีม กรุณาเพิ่มชื่อในหน้า "สมาชิก" ก่อน');
+    showPage('team'); return;
+  }
   editId = id;
   const t = id ? tasks.find(x => x.id === id) : null;
+  fillAssignee(t ? t.assignee : null);
   $('modal-title').textContent = t ? 'แก้ไขงาน' : 'สร้างงานใหม่';
   $('f-title').value    = t ? t.title    : '';
   $('f-desc').value     = t ? t.desc     : '';
-  $('f-assignee').value = t ? t.assignee : USERS[0];
+  $('f-assignee').value = t ? t.assignee : users[0];
   $('f-due').value      = t ? t.due      : d(3);
   $('f-priority').value = t ? t.priority : 'NORMAL';
   $('f-status').value   = t ? t.status   : 'TODO';
@@ -489,7 +593,6 @@ function saveTask(){
 }
 
 /* ========== DELETE ========== */
-/* ลบจาก id ใดก็ได้ — ใช้ร่วมกันทั้งการ์ด, sheet, modal, แดชบอร์ด */
 function removeTask(id){
   const idx = tasks.findIndex(x => x.id === id);
   if(idx === -1) return;
@@ -508,11 +611,7 @@ function undoDelete(){
   save(); render(); hideToast();
   notify(`↩️ กู้คืน "${name}" เรียบร้อย`);
 }
-function delTask(){
-  const id = editId;
-  closeModal();
-  setTimeout(() => removeTask(id), 60);
-}
+function delTask(){ const id = editId; closeModal(); setTimeout(() => removeTask(id), 60); }
 function clearAll(){
   if(!tasks.length) return alert('ยังไม่มีงานให้ลบ');
   if(!confirm(`ลบงานทั้งหมด ${tasks.length} รายการ? กู้คืนไม่ได้`)) return;
@@ -523,14 +622,14 @@ function clearAll(){
 /* ========== LINE / DATA ========== */
 function toggleLine(){
   lineConnected = !lineConnected;
-  $('line-status').textContent = lineConnected ? '✅ เชื่อมต่อแล้ว — สมชาย ใจดี' : 'ยังไม่ได้เชื่อมต่อ';
+  $('line-status').textContent = lineConnected ? '✅ เชื่อมต่อแล้ว' : 'ยังไม่ได้เชื่อมต่อ';
   const b = $('line-btn');
   b.textContent = lineConnected ? 'ยกเลิก' : 'เชื่อมต่อ';
   b.className = (lineConnected ? 'border text-slate-700' : 'bg-[#06C755] text-white') + ' px-4 py-2.5 rounded-lg text-sm font-medium shrink-0';
   if(lineConnected) notify('🎉 เชื่อมต่อ LINE สำเร็จ! คุณจะได้รับแจ้งเตือนจากนี้ไป');
 }
 function exportData(){
-  const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'});
+  const blob = new Blob([JSON.stringify({users, tasks}, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `taskflow-${today()}.json`;
@@ -538,20 +637,22 @@ function exportData(){
   URL.revokeObjectURL(a.href);
 }
 function resetData(){
-  if(!confirm('รีเซ็ตกลับเป็นข้อมูลตัวอย่าง? งานที่เพิ่มไว้จะหายทั้งหมด')) return;
-  tasks = SEED(); save(); render();
+  if(!confirm('รีเซ็ตกลับเป็นข้อมูลตัวอย่าง? งานและสมาชิกที่เพิ่มไว้จะหายทั้งหมด')) return;
+  tasks = SEED(); users = [...DEFAULT_USERS]; filter = 'ALL';
+  save(); saveUsers(); render();
   notify('♻️ รีเซ็ตข้อมูลเรียบร้อย');
 }
 
 /* ========== INIT ========== */
 (function init(){
+  loadUsers();
   load();
-  $('f-assignee').innerHTML = USERS.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
   $('notif-settings').innerHTML = NOTIFS.map((l,i) => `
     <label class="flex items-center justify-between py-3 border-b last:border-0">
       <span class="text-sm pr-3">${l}</span>
       <input type="checkbox" ${i === 3 ? '' : 'checked'} class="w-11 h-6 accent-emerald-500 shrink-0">
     </label>`).join('');
+  $('f-newuser').addEventListener('keydown', e => { if(e.key === 'Enter') addUser(); });
   $('modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
   document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeModal(); closeSheet(); } });
   window.addEventListener('resize', () => { if(!isMobile()) closeSheet(); });
