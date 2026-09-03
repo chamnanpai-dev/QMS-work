@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10b981">
+<meta name="description" content="TaskFlow – ระบบติดตามงานทีม พร้อมแจ้งเตือนผ่าน LINE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TaskFlow">
+<title>TaskFlow – ระบบติดตามงาน</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2310b981'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='sans-serif' font-weight='bold' fill='white'>T</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Noto Sans Thai',system-ui,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:none}
+  .safe-b{padding-bottom:env(safe-area-inset-bottom)}
+  .drag-over{background:#e0f2fe;border-color:#0284c7}
+  .dragging{opacity:.4}
+  .scroll-x{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+  .scroll-x>*{scroll-snap-align:start}
+  .scroll-x::-webkit-scrollbar,.no-sb::-webkit-scrollbar{display:none}
+  .no-sb{-ms-overflow-style:none;scrollbar-width:none}
+  .sheet{transition:transform .25s cubic-bezier(.32,.72,0,1)}
+  .sheet.closed{transform:translateY(110%)}
+  .fade{animation:fade .18s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .pop{animation:pop .2s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes pop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 pb-20 md:pb-0">
+
+<!-- ================= HEADER ================= -->
+<header class="bg-white border-b sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 md:w-9 md:h-9 bg-emerald-500 rounded-lg grid place-items-center text-white font-bold">T</div>
+      <span class="font-bold">TaskFlow</span>
+    </div>
+    <nav class="hidden md:flex gap-1">
+      <button onclick="showPage('dashboard')" data-nav="dashboard" class="px-4 py-2 rounded-lg text-sm font-medium">แดชบอร์ด</button>
+      <button onclick="showPage('board')" data-nav="board" class="px-4 py-2 rounded-lg text-sm font-medium">บอร์ดงาน</button>
+      <button onclick="showPage('settings')" data-nav="settings" class="px-4 py-2 rounded-lg text-sm font-medium">ตั้งค่า LINE</button>
+    </nav>
+    <button onclick="openModal()" class="hidden md:block bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ สร้างงาน</button>
+    <span id="hdr-title" class="md:hidden text-sm text-slate-500">แดชบอร์ด</span>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6">
+
+  <!-- ================= DASHBOARD ================= -->
+  <section id="page-dashboard">
+    <h1 class="text-xl md:text-2xl font-bold mb-4 md:mb-6">ภาพรวมงาน</h1>
+    <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-4 mb-6"></div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl border p-4">
+        <h2 class="font-bold mb-3 text-sm">🔥 งานเลยกำหนด</h2>
+        <div id="overdue-list" class="space-y-2"></div>
+      </div>
+      <div class="bg-white rounded-xl border p-4">
+        <h2 class="font-bold mb-3 text-sm">⏰ ครบกำหนดใน 3 วัน</h2>
+        <div id="soon-list" class="space-y-2"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border p-4 mt-4">
+      <h2 class="font-bold mb-3 text-sm">👥 งานแยกตามผู้รับผิดชอบ</h2>
+      <div id="by-user" class="space-y-3"></div>
+    </div>
+  </section>
+
+  <!-- ================= BOARD ================= -->
+  <section id="page-board" class="hidden">
+    <div class="flex items-start justify-between gap-3 mb-3">
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold mb-1">บอร์ดงาน</h1>
+        <p class="text-slate-500 text-xs md:text-sm">
+          <span class="md:hidden">แตะการ์ดเพื่อเปลี่ยนสถานะ · ปุ่ม ✏️ 🗑️ แก้ไข/ลบ</span>
+          <span class="hidden md:inline">ลากการ์ดเพื่อเปลี่ยนสถานะ · ปุ่ม ✏️ 🗑️ แก้ไข/ลบ</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex gap-2 mb-4 overflow-x-auto no-sb -mx-3 px-3 md:mx-0 md:px-0">
+      <button onclick="setFilter('ALL')" data-flt="ALL" class="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border">ทุกคน</button>
+      <span id="user-filters" class="contents"></span>
+    </div>
+    <div id="board" class="scroll-x flex md:grid md:grid-cols-4 gap-3 overflow-x-auto pb-2 -mx-3 px-3 md:mx-0 md:px-0"></div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section id="page-settings" class="hidden max-w-2xl">
+    <h1 class="text-xl md:text-2xl font-bold mb-4">ตั้งค่า LINE</h1>
+
+    <div class="bg-white rounded-xl border p-4 mb-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-bold text-sm">สถานะการเชื่อมต่อ</p>
+          <p id="line-status" class="text-xs text-slate-500 mt-0.5">ยังไม่ได้เชื่อมต่อ</p>
+        </div>
+        <button id="line-btn" onclick="toggleLine()" class="bg-[#06C755] text-white px-4 py-2.5 rounded-lg text-sm font-medium shrink-0">เชื่อมต่อ</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4 mb-3">
+      <p class="font-bold text-sm mb-2">ประเภทการแจ้งเตือน</p>
+      <div id="notif-settings"></div>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4 mb-3">
+      <p class="font-bold text-sm mb-3">ตัวอย่างข้อความใน LINE</p>
+      <div class="bg-[#8CABD8] rounded-xl p-3">
+        <div class="bg-white rounded-xl overflow-hidden shadow max-w-[260px]">
+          <div class="p-3.5">
+            <p class="text-emerald-600 text-[11px] font-bold mb-1">📋 งานที่ได้รับมอบหมาย</p>
+            <p class="font-bold leading-snug">ทำสไลด์นำเสนอลูกค้า</p>
+            <p class="text-slate-500 text-xs mt-2">⏰ กำหนดส่ง: 5 ก.ย. 2569</p>
+            <p class="text-slate-500 text-xs">👤 โดย: หัวหน้าทีม</p>
+          </div>
+          <div class="px-3.5 pb-3.5">
+            <div class="bg-emerald-500 text-white text-center py-2 rounded-lg text-xs font-medium">เปิดดูงาน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border p-4">
+      <p class="font-bold text-sm mb-3">จัดการข้อมูล</p>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="exportData()" class="border px-4 py-2.5 rounded-lg text-sm font-medium">⬇️ ส่งออก JSON</button>
+        <button onclick="clearAll()" class="border border-red-200 text-red-600 px-4 py-2.5 rounded-lg text-sm font-medium">🗑️ ลบงานทั้งหมด</button>
+        <button onclick="resetData()" class="border px-4 py-2.5 rounded-lg text-sm font-medium">♻️ รีเซ็ตข้อมูลตัวอย่าง</button>
+      </div>
+      <p class="text-[11px] text-slate-400 mt-3">ข้อมูลถูกเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น (localStorage) ยังไม่ sync ข้ามเครื่อง</p>
+    </div>
+  </section>
+</main>
+
+<!-- ================= FAB ================= -->
+<button onclick="openModal()" class="md:hidden fixed right-4 bottom-20 z-40 w-14 h-14 bg-emerald-500 text-white rounded-full shadow-lg text-3xl leading-none grid place-items-center active:scale-95 transition">+</button>
+
+<!-- ================= BOTTOM NAV ================= -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t safe-b">
+  <div class="grid grid-cols-3">
+    <button onclick="showPage('dashboard')" data-tab="dashboard" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">📊</span>แดชบอร์ด</button>
+    <button onclick="showPage('board')" data-tab="board" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">📋</span>บอร์ดงาน</button>
+    <button onclick="showPage('settings')" data-tab="settings" class="py-2.5 flex flex-col items-center gap-0.5 text-[11px]"><span class="text-lg">⚙️</span>ตั้งค่า</button>
+  </div>
+</nav>
+
+<!-- ================= ACTION SHEET ================= -->
+<div id="sheet-bg" class="hidden fade fixed inset-0 bg-black/40 z-50" onclick="closeSheet()"></div>
+<div id="sheet" class="sheet closed fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl p-4 safe-b">
+  <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3"></div>
+  <p id="sheet-title" class="font-bold leading-snug"></p>
+  <p id="sheet-sub" class="text-xs text-slate-500 mb-4 mt-0.5"></p>
+  <p class="text-xs font-medium text-slate-500 mb-2">เปลี่ยนสถานะเป็น</p>
+  <div id="sheet-status" class="grid grid-cols-2 gap-2 mb-3"></div>
+  <div class="grid grid-cols-2 gap-2">
+    <button onclick="editFromSheet()" class="border py-3 rounded-xl font-medium text-sm">✏️ แก้ไข</button>
+    <button onclick="delFromSheet()" class="border border-red-200 text-red-600 py-3 rounded-xl font-medium text-sm">🗑️ ลบงาน</button>
+  </div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="modal" class="hidden fade fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center md:p-4">
+  <div class="bg-white rounded-t-2xl md:rounded-2xl w-full md:max-w-lg p-5 max-h-[92vh] overflow-y-auto safe-b pop">
+    <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-3 md:hidden"></div>
+    <h2 id="modal-title" class="text-lg font-bold mb-4">สร้างงานใหม่</h2>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium mb-1">ชื่องาน *</label>
+        <input id="f-title" class="w-full border rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-emerald-400 outline-none" placeholder="เช่น ทำสไลด์นำเสนอ">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">รายละเอียด</label>
+        <textarea id="f-desc" rows="2" class="w-full border rounded-xl px-3 py-3 text-base focus:ring-2 focus:ring-emerald-400 outline-none"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">ผู้รับผิดชอบ</label>
+          <select id="f-assignee" class="w-full border rounded-xl px-3 py-3 text-base bg-white"></select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">กำหนดส่ง</label>
+          <input id="f-due" type="date" class="w-full border rounded-xl px-3 py-3 text-base bg-white">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">ความสำคัญ</label>
+          <select id="f-priority" class="w-full border rounded-xl px-3 py-3 text-base bg-white">
+            <option value="LOW">ต่ำ</option><option value="NORMAL">ปกติ</option><option value="HIGH">สูง</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">สถานะ</label>
+          <select id="f-status" class="w-full border rounded-xl px-3 py-3 text-base bg-white">
+            <option value="TODO">รอดำเนินการ</option><option value="DOING">กำลังทำ</option>
+            <option value="REVIEW">รอตรวจ</option><option value="DONE">เสร็จแล้ว</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button onclick="closeModal()" class="flex-1 border py-3 rounded-xl font-medium">ยกเลิก</button>
+      <button onclick="saveTask()" class="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-medium">บันทึก</button>
+    </div>
+    <button id="del-btn" onclick="delTask()" class="hidden w-full text-red-600 text-sm py-3 mt-1">🗑️ ลบงานนี้</button>
+  </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div id="toast" class="hidden fixed z-[70] bg-white border-l-4 border-[#06C755] rounded-xl shadow-xl p-3.5 left-3 right-3 bottom-36 md:left-auto md:right-6 md:bottom-6 md:max-w-sm">
+  <div class="flex items-center gap-3">
+    <div class="min-w-0 flex-1">
+      <p id="toast-tag" class="text-[11px] text-[#06C755] font-bold mb-0.5">LINE Notification</p>
+      <p id="toast-msg" class="text-sm leading-snug"></p>
+    </div>
+    <button id="toast-undo" onclick="undoDelete()" class="hidden shrink-0 border border-emerald-500 text-emerald-600 text-xs font-bold px-3 py-2 rounded-lg">เลิกทำ</button>
+  </div>
+</div>
+
+<script>
+/* ========== HELPERS ========== */
+const $  = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().slice(0,10); };
+const today = () => new Date().toISOString().slice(0,10);
+const isMobile = () => window.innerWidth < 768;
+const fmtDate = s => s ? new Date(s).toLocaleDateString('th-TH',{day:'numeric',month:'short'}) : '-';
+
+/* ========== CONFIG ========== */
+const USERS = ['สมชาย','สมหญิง','วิชัย','ปรีชา'];
+const COLS = [
+  {k:'TODO',   label:'รอดำเนินการ', dot:'bg-slate-400',   btn:'bg-slate-100 text-slate-700'},
+  {k:'DOING',  label:'กำลังทำ',      dot:'bg-blue-500',    btn:'bg-blue-100 text-blue-700'},
+  {k:'REVIEW', label:'รอตรวจ',       dot:'bg-amber-500',   btn:'bg-amber-100 text-amber-700'},
+  {k:'DONE',   label:'เสร็จแล้ว',    dot:'bg-emerald-500', btn:'bg-emerald-100 text-emerald-700'},
+];
+const PRI = {
+  HIGH:   ['สูง',  'bg-red-100 text-red-700'],
+  NORMAL: ['ปกติ', 'bg-blue-100 text-blue-700'],
+  LOW:    ['ต่ำ',  'bg-slate-100 text-slate-600'],
+};
+const NOTIFS = ['ได้รับมอบหมายงานใหม่','เตือนก่อนครบกำหนด 1 วัน','งานเลยกำหนด','มีการเปลี่ยนสถานะ','สรุปงานประจำวัน 09:00'];
+const PAGES = {dashboard:'แดชบอร์ด', board:'บอร์ดงาน', settings:'ตั้งค่า LINE'};
+const SEED = () => ([
+  {id:1,title:'ทำสไลด์นำเสนอลูกค้า',desc:'เตรียม 15 หน้า พร้อมตัวเลขไตรมาส 3',assignee:'สมชาย',due:d(-2),priority:'HIGH',status:'DOING'},
+  {id:2,title:'สรุปยอดขายรายเดือน',desc:'',assignee:'สมหญิง',due:d(1),priority:'NORMAL',status:'TODO'},
+  {id:3,title:'ออกแบบ Landing Page',desc:'ตาม Brand Guideline ใหม่',assignee:'วิชัย',due:d(3),priority:'HIGH',status:'REVIEW'},
+  {id:4,title:'อัปเดตเอกสาร API',desc:'',assignee:'ปรีชา',due:d(7),priority:'LOW',status:'TODO'},
+  {id:5,title:'ตรวจสอบ Bug หน้าล็อกอิน',desc:'',assignee:'สมชาย',due:d(-1),priority:'HIGH',status:'DOING'},
+  {id:6,title:'ประชุมสรุปโปรเจกต์',desc:'',assignee:'สมหญิง',due:d(-5),priority:'NORMAL',status:'DONE'},
+]);
+
+/* ========== STATE ========== */
+let tasks = [], editId = null, sheetId = null, dragId = null, filter = 'ALL', lineConnected = false;
+let trash = null;   // เก็บงานที่เพิ่งลบ ไว้กู้คืน
+
+function load(){
+  try {
+    const raw = localStorage.getItem('taskflow.tasks');
+    const parsed = raw ? JSON.parse(raw) : null;
+    tasks = Array.isArray(parsed) ? parsed : SEED();
+  } catch { tasks = SEED(); }
+}
+function save(){
+  try { localStorage.setItem('taskflow.tasks', JSON.stringify(tasks)); } catch(e){ console.warn('บันทึกไม่ได้:', e); }
+}
+const isOverdue = t => t.due && t.due < today() && t.status !== 'DONE';
+
+/* ========== NAVIGATION ========== */
+function showPage(p){
+  Object.keys(PAGES).forEach(x => {
+    $('page-'+x).classList.toggle('hidden', x !== p);
+    const n = document.querySelector(`[data-nav="${x}"]`);
+    if(n) n.className = 'px-4 py-2 rounded-lg text-sm font-medium ' + (x===p ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-100');
+    const t = document.querySelector(`[data-tab="${x}"]`);
+    if(t) t.className = 'py-2.5 flex flex-col items-center gap-0.5 text-[11px] ' + (x===p ? 'text-emerald-600 font-bold' : 'text-slate-400');
+  });
+  $('hdr-title').textContent = PAGES[p];
+  window.scrollTo(0,0);
+}
+
+/* ========== TOAST ========== */
+function notify(msg, opts = {}){
+  $('toast-msg').textContent = msg;
+  $('toast-tag').textContent = opts.tag || 'LINE Notification';
+  $('toast-undo').classList.toggle('hidden', !opts.undo);
+  $('toast').classList.remove('hidden');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(hideToast, opts.undo ? 6000 : 3500);
+  if(navigator.vibrate) navigator.vibrate(25);
+}
+function hideToast(){
+  $('toast').classList.add('hidden');
+  $('toast-undo').classList.add('hidden');
+  trash = null;
+}
+
+/* ========== RENDER ========== */
+function render(){
+  /* — สถิติ — */
+  const stats = [
+    ['ทั้งหมด',   tasks.length,                                  'text-slate-800'],
+    ['กำลังทำ',   tasks.filter(t => t.status==='DOING').length,   'text-blue-600'],
+    ['เลยกำหนด',  tasks.filter(isOverdue).length,                 'text-red-600'],
+    ['เสร็จแล้ว', tasks.filter(t => t.status==='DONE').length,    'text-emerald-600'],
+  ];
+  $('stats').innerHTML = stats.map(([l,v,c]) => `
+    <div class="bg-white rounded-xl border p-3.5 md:p-5">
+      <p class="text-xs md:text-sm text-slate-500 mb-0.5">${l}</p>
+      <p class="text-2xl md:text-3xl font-bold ${c}">${v}</p>
+    </div>`).join('');
+
+  /* — รายการเตือน (แตะเพื่อแก้ไข / ปุ่มลบท้ายแถว) — */
+  const row = t => `
+    <div class="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+      <div onclick="openTask(${t.id})" class="min-w-0 flex-1 cursor-pointer active:opacity-70">
+        <p class="font-medium text-sm truncate">${esc(t.title)}</p>
+        <p class="text-[11px] text-slate-500">${esc(t.assignee)} · ${fmtDate(t.due)}</p>
+      </div>
+      <span class="text-[11px] px-2 py-1 rounded-full shrink-0 ${PRI[t.priority][1]}">${PRI[t.priority][0]}</span>
+      <button onclick="event.stopPropagation();removeTask(${t.id})" title="ลบ"
+        class="w-7 h-7 grid place-items-center rounded-lg hover:bg-red-50 active:bg-red-100 text-sm shrink-0">🗑️</button>
+    </div>`;
+  const empty = '<p class="text-sm text-slate-400 py-4 text-center">ไม่มีรายการ 🎉</p>';
+  const od   = tasks.filter(isOverdue);
+  const soon = tasks.filter(t => t.due >= today() && t.due <= d(3) && t.status !== 'DONE');
+  $('overdue-list').innerHTML = od.length   ? od.map(row).join('')   : empty;
+  $('soon-list').innerHTML    = soon.length ? soon.map(row).join('') : empty;
+
+  /* — งานแยกตามคน — */
+  $('by-user').innerHTML = USERS.map(u => {
+    const mine = tasks.filter(t => t.assignee === u);
+    const done = mine.filter(t => t.status === 'DONE').length;
+    const pct  = mine.length ? Math.round(done / mine.length * 100) : 0;
+    return `<div>
+      <div class="flex justify-between text-xs mb-1">
+        <span class="font-medium">${esc(u)}</span>
+        <span class="text-slate-500">${done}/${mine.length} เสร็จ</span>
+      </div>
+      <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div class="h-full bg-emerald-500 rounded-full transition-all" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  /* — ตัวกรองผู้รับผิดชอบ — */
+  $('user-filters').innerHTML = USERS.map(u =>
+    `<button onclick="setFilter('${esc(u)}')" data-flt="${esc(u)}" class="shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border">${esc(u)}</button>`).join('');
+  document.querySelectorAll('[data-flt]').forEach(b => {
+    const on = b.dataset.flt === filter;
+    b.className = 'shrink-0 px-3.5 py-2 rounded-full text-xs font-medium border ' +
+      (on ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-600');
+  });
+
+  /* — บอร์ด — */
+  const visible = filter === 'ALL' ? tasks : tasks.filter(t => t.assignee === filter);
+  $('board').innerHTML = COLS.map(c => {
+    const items = visible.filter(t => t.status === c.k);
+    return `<div class="bg-slate-200/60 rounded-xl p-3 border-2 border-transparent min-w-[80vw] md:min-w-0 min-h-[160px] shrink-0"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="drop(event,'${c.k}',this)">
+      <div class="flex items-center gap-2 mb-3 px-1">
+        <span class="w-2 h-2 rounded-full ${c.dot}"></span>
+        <span class="font-bold text-sm">${c.label}</span>
+        <span class="ml-auto text-xs bg-white px-2 py-0.5 rounded-full">${items.length}</span>
+      </div>
+      <div class="space-y-2">${items.map(card).join('') || '<p class="text-xs text-slate-400 text-center py-6">ไม่มีงาน</p>'}</div>
+    </div>`;
+  }).join('');
+}
+
+/* การ์ด: แตะตัวการ์ด = เปิดดู/เปลี่ยนสถานะ, ปุ่ม ✏️ = แก้ไข, ปุ่ม 🗑️ = ลบ */
+function card(t){
+  return `<div draggable="true" ondragstart="drag(event,${t.id},this)" ondragend="this.classList.remove('dragging')"
+      class="bg-white rounded-xl p-3 shadow-sm transition ${isOverdue(t) ? 'border-l-4 border-red-500' : ''}">
+    <div onclick="openTask(${t.id})" class="cursor-pointer active:opacity-70">
+      <p class="font-medium text-sm leading-snug mb-1.5">${esc(t.title)}</p>
+      ${t.desc ? `<p class="text-xs text-slate-500 mb-2">${esc(t.desc)}</p>` : ''}
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] px-2 py-0.5 rounded-full ${PRI[t.priority][1]}">${PRI[t.priority][0]}</span>
+        <span class="text-[11px] ${isOverdue(t) ? 'text-red-600 font-bold' : 'text-slate-500'}">${fmtDate(t.due)}</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 mt-2 pt-2 border-t">
+      <div class="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] grid place-items-center shrink-0">${esc(t.assignee[0])}</div>
+      <span class="text-[11px] text-slate-600 truncate">${esc(t.assignee)}</span>
+      <button onclick="event.stopPropagation();openModal(${t.id})" title="แก้ไข"
+        class="ml-auto w-7 h-7 grid place-items-center rounded-lg hover:bg-slate-100 active:bg-slate-200 text-sm shrink-0">✏️</button>
+      <button onclick="event.stopPropagation();removeTask(${t.id})" title="ลบ"
+        class="w-7 h-7 grid place-items-center rounded-lg hover:bg-red-50 active:bg-red-100 text-sm shrink-0">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function setFilter(f){ filter = f; render(); }
+
+/* ========== เปิดงาน: มือถือ=sheet / เดสก์ท็อป=modal ========== */
+function openTask(id){ isMobile() ? openSheet(id) : openModal(id); }
+
+function openSheet(id){
+  const t = tasks.find(x => x.id === id);
+  if(!t) return;
+  sheetId = id;
+  $('sheet-title').textContent = t.title;
+  $('sheet-sub').textContent   = `${t.assignee} · กำหนดส่ง ${fmtDate(t.due)}`;
+  $('sheet-status').innerHTML  = COLS.map(c =>
+    `<button onclick="setStatus('${c.k}')" class="py-3 rounded-xl text-sm font-medium ${c.btn} ${t.status===c.k ? 'ring-2 ring-emerald-500' : ''}">${c.label}</button>`).join('');
+  $('sheet-bg').classList.remove('hidden');
+  requestAnimationFrame(() => $('sheet').classList.remove('closed'));
+}
+function closeSheet(){
+  $('sheet').classList.add('closed');
+  $('sheet-bg').classList.add('hidden');
+}
+function setStatus(k){
+  const t = tasks.find(x => x.id === sheetId);
+  if(t && t.status !== k){
+    t.status = k; save(); render();
+    notify(`📌 "${t.title}" → ${COLS.find(c => c.k === k).label}`);
+  }
+  closeSheet();
+}
+function editFromSheet(){
+  const id = sheetId;
+  closeSheet();
+  setTimeout(() => openModal(id), 200);
+}
+function delFromSheet(){
+  const id = sheetId;
+  closeSheet();
+  setTimeout(() => removeTask(id), 200);
+}
+
+/* ========== DRAG & DROP ========== */
+function drag(e, id, el){ dragId = id; el.classList.add('dragging'); e.stopPropagation(); }
+function drop(e, status, el){
+  e.preventDefault();
+  el.classList.remove('drag-over');
+  const t = tasks.find(x => x.id === dragId);
+  if(t && t.status !== status){
+    t.status = status; save(); render();
+    notify(`📌 "${t.title}" → ${COLS.find(c => c.k === status).label}`);
+  }
+  dragId = null;
+}
+
+/* ========== CREATE / EDIT ========== */
+function openModal(id = null){
+  editId = id;
+  const t = id ? tasks.find(x => x.id === id) : null;
+  $('modal-title').textContent = t ? 'แก้ไขงาน' : 'สร้างงานใหม่';
+  $('f-title').value    = t ? t.title    : '';
+  $('f-desc').value     = t ? t.desc     : '';
+  $('f-assignee').value = t ? t.assignee : USERS[0];
+  $('f-due').value      = t ? t.due      : d(3);
+  $('f-priority').value = t ? t.priority : 'NORMAL';
+  $('f-status').value   = t ? t.status   : 'TODO';
+  $('del-btn').classList.toggle('hidden', !t);
+  $('modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  if(!t && !isMobile()) setTimeout(() => $('f-title').focus(), 50);
+}
+function closeModal(){
+  $('modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  editId = null;
+}
+function saveTask(){
+  const title = $('f-title').value.trim();
+  if(!title){ alert('กรุณากรอกชื่องาน'); $('f-title').focus(); return; }
+  const data = {
+    title,
+    desc:     $('f-desc').value.trim(),
+    assignee: $('f-assignee').value,
+    due:      $('f-due').value,
+    priority: $('f-priority').value,
+    status:   $('f-status').value,
+  };
+  if(editId){
+    const t = tasks.find(x => x.id === editId);
+    if(t){ Object.assign(t, data); notify(`✏️ อัปเดต "${title}" เรียบร้อย`); }
+  } else {
+    tasks.push({ id: Date.now(), ...data });
+    notify(`📋 แจ้งเตือน ${data.assignee}: งานใหม่ "${title}" กำหนดส่ง ${fmtDate(data.due)}`);
+  }
+  save(); render(); closeModal();
+}
+
+/* ========== DELETE ========== */
+/* ลบจาก id ใดก็ได้ — ใช้ร่วมกันทั้งการ์ด, sheet, modal, แดชบอร์ด */
+function removeTask(id){
+  const idx = tasks.findIndex(x => x.id === id);
+  if(idx === -1) return;
+  const t = tasks[idx];
+  if(!confirm(`ต้องการลบงาน "${t.title}" ใช่ไหม?`)) return;
+  trash = { task: t, index: idx };
+  tasks.splice(idx, 1);
+  save(); render();
+  notify(`ลบ "${t.title}" แล้ว`, { tag:'🗑️ ลบงาน', undo:true });
+}
+function undoDelete(){
+  if(!trash) return;
+  tasks.splice(trash.index, 0, trash.task);
+  const name = trash.task.title;
+  trash = null;
+  save(); render(); hideToast();
+  notify(`↩️ กู้คืน "${name}" เรียบร้อย`);
+}
+function delTask(){
+  const id = editId;
+  closeModal();
+  setTimeout(() => removeTask(id), 60);
+}
+function clearAll(){
+  if(!tasks.length) return alert('ยังไม่มีงานให้ลบ');
+  if(!confirm(`ลบงานทั้งหมด ${tasks.length} รายการ? กู้คืนไม่ได้`)) return;
+  tasks = []; save(); render();
+  notify('🗑️ ลบงานทั้งหมดเรียบร้อย');
+}
+
+/* ========== LINE / DATA ========== */
+function toggleLine(){
+  lineConnected = !lineConnected;
+  $('line-status').textContent = lineConnected ? '✅ เชื่อมต่อแล้ว — สมชาย ใจดี' : 'ยังไม่ได้เชื่อมต่อ';
+  const b = $('line-btn');
+  b.textContent = lineConnected ? 'ยกเลิก' : 'เชื่อมต่อ';
+  b.className = (lineConnected ? 'border text-slate-700' : 'bg-[#06C755] text-white') + ' px-4 py-2.5 rounded-lg text-sm font-medium shrink-0';
+  if(lineConnected) notify('🎉 เชื่อมต่อ LINE สำเร็จ! คุณจะได้รับแจ้งเตือนจากนี้ไป');
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `taskflow-${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function resetData(){
+  if(!confirm('รีเซ็ตกลับเป็นข้อมูลตัวอย่าง? งานที่เพิ่มไว้จะหายทั้งหมด')) return;
+  tasks = SEED(); save(); render();
+  notify('♻️ รีเซ็ตข้อมูลเรียบร้อย');
+}
+
+/* ========== INIT ========== */
+(function init(){
+  load();
+  $('f-assignee').innerHTML = USERS.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+  $('notif-settings').innerHTML = NOTIFS.map((l,i) => `
+    <label class="flex items-center justify-between py-3 border-b last:border-0">
+      <span class="text-sm pr-3">${l}</span>
+      <input type="checkbox" ${i === 3 ? '' : 'checked'} class="w-11 h-6 accent-emerald-500 shrink-0">
+    </label>`).join('');
+  $('modal').addEventListener('click', e => { if(e.target.id === 'modal') closeModal(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeModal(); closeSheet(); } });
+  window.addEventListener('resize', () => { if(!isMobile()) closeSheet(); });
+  showPage('dashboard');
+  render();
+})();
+</script>
+</body>
+</html>
